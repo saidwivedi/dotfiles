@@ -8,10 +8,18 @@ A modern, feature-rich configuration for shell environments (zsh/bash), vim, and
 ├── zshrc                      # Modern zsh configuration
 ├── bashrc                     # Bash configuration
 ├── vimrc                      # Vim configuration with enhanced Python support
-└── functions/
-    ├── download_functions.zsh # Advanced rsync-based file transfer utilities
-    ├── remote_explorer.zsh    # SSHFS remote filesystem mounting
-    └── wandb_functions.zsh    # WandB experiment synchronization
+├── functions/
+│   ├── download_functions.zsh # Advanced rsync-based file transfer utilities
+│   ├── remote_explorer.zsh    # SSHFS remote filesystem mounting
+│   └── wandb_functions.zsh    # WandB experiment synchronization
+└── claude/
+    ├── CLAUDE.md              # Global instructions for Claude Code
+    ├── settings.json          # Hooks and plugin configuration
+    ├── hooks/                 # Custom hook scripts
+    ├── commands/              # Custom slash commands
+    ├── agents/                # Custom agent definitions
+    ├── scripts/               # Utility scripts
+    └── install.sh             # Installation script
 ```
 
 ## ⚙️ Configuration
@@ -54,6 +62,25 @@ Alternatively, you can edit the default values directly in each function file.
 - **Plugin support** for NERDTree, FZF, ALE linting, AnyJump
 - **Modern status line** with mode indicators and file info
 - **Auto-extraction function** for various archive formats
+
+### Claude Code Configuration (claude/)
+
+Portable configuration for [Claude Code](https://github.com/anthropics/claude-code) CLI:
+
+```bash
+# Install on a new device
+./claude/install.sh
+```
+
+**Contents:**
+- **CLAUDE.md**: Global instructions and preferences
+- **settings.json**: Hooks, plugins, and statusline configuration
+- **hooks/**: Custom hook scripts (e.g., smart routing, notifications)
+- **commands/**: Custom slash commands
+- **agents/**: Custom agent definitions
+- **scripts/**: Utility scripts
+
+**Note:** Sensitive data (history, session files, cache) is excluded from this repo.
 
 ### 📡 Download Functions (download_functions.zsh)
 
