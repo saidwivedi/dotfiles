@@ -1,36 +1,122 @@
 # Global Preferences
 
+These rules bias toward rigor over speed. For trivial tasks, use judgment and skip the ceremony. The rules are working if: diffs contain only lines that trace to the ask, ambiguity surfaces before implementation rather than after, and I rarely have to ask you to redo something.
+
+## Identity
+## Write about yourself, you active research interest, projects you are working
+
+## Environment
+## HPC cluster paths, micromamba conventions, and anything specific to working environmet: @~/.claude/ENV.md
+
 ## Git Workflow
 - Never add "Co-Authored-By: Claude" attribution in commits
-- Never add "Generated with Claude Code" messages in commits
+- Never add "Generated with Claude Code" messages anywhere
 - Keep commit messages clean and professional
 
 ## Code Style
 - Only add comments where logic isn't self-evident
-- Avoid over-engineering - keep solutions simple and focused
-- Don't add features beyond what was requested
+- argparse for all scripts with sensible defaults
+- Always set random seeds for reproducibility
+- Use `skip-if-exists` pattern for long-running batch jobs
 
 ## Communication
-- Be concise and to the point
-- Don't use emojis unless explicitly requested
+- Be concise. No recaps, no pleasantries
+- Ask clarifying questions when the ask itself is ambiguous — unclear scope, multiple reasonable interpretations, unstated constraints. Surface the ambiguity before implementing, don't silently pick
+- Don't ask for permission ("want me to run it?", "should I proceed?") — mode shortcuts below cover that
+- Don't use emojis
 - Focus on technical accuracy over validation
+- One response per action — don't split into multiple messages
+- Don't paraphrase what you just did — I saw it happen
 
-## Documentation & Token Conservation
-- Never write summary documents unless specifically asked to
-- Never create architecture diagrams unless asked to
-- Avoid creating multiple documentation files for a single task
-- Provide concise inline explanations instead of separate docs
+## Subagent Policy
+- Offload ALL script execution, testing, and analysis to subagents
+- Main agent only: planning, code edits, quick bash checks (job status, ls, git)
+- Anything that loads models, processes data, or takes >10s → subagent (background when possible)
+- Launch multiple subagents in parallel for independent checks
+- Keep main context clean and responsive — never block on long-running commands
 
-## Token-Wasting Patterns to Avoid
-- Don't repeat yourself - no recap messages after completing work
-- Don't create "quick start" or "cheat sheet" files unless asked
-- Don't write test files unless explicitly requested
-- Don't create example usage files unprompted
-- Don't paraphrase what you just did - user saw it happen
-- Don't ask "would you like me to..." questions - just present options concisely
+## When I Paste an Error
+- Diagnose root cause and apply fix immediately
+- Don't ask clarifying questions — read the traceback and relevant code
+- Show the fix, suggest the re-run command
+
+## When I Say "Run It"
+- Execute the script, capture full output, analyze results
+- Don't ask for confirmation — just run
+- If it fails, diagnose and fix without waiting for me
+
+## When I Say "Check Results"
+- Read metrics.json (or equivalent) from all relevant subdirs
+- Generate a comparison table
+- Identify best/worst, flag anomalies
+
+## Documentation
+- Never create unsolicited READMEs, architecture diagrams, or summary docs
+- Never create "quick start" or "cheat sheet" files unless asked
+- Don't create test files or example usage files unprompted
 - Don't create wrapper scripts unless they add real value
-- Don't write verbose comments in code explaining obvious things
-- Skip pleasantries and status updates - be direct
+
+## Research Conventions
+- Output folder names MUST start with `MMDD_` prefix (e.g. `outputs/0308_<EXP_NAME>/`)
+- Save metrics as `metrics.json` in output folders
+- Log to wandb during training
+- Compare against baselines before declaring success
+- Document what DOESN'T work as thoroughly as what does
+- Failed experiments: move to `failed/` subdirectory, don't delete
+- Exploration scripts go in `explore/`, promoted to main modules when validated
+
+## Token Conservation
+- Don't repeat yourself — no recap messages after completing work
+- Don't write test files unless explicitly requested
+- Skip status updates — be direct
 - Don't create README files for simple implementations
-- One response per action - don't split into multiple messages
-- Use TodoWrite efficiently - don't update for every tiny step
+- Use TodoWrite efficiently — don't update for every tiny step
+
+## Workflow
+
+### Plan Before Build
+- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- If something goes sideways, STOP and re-plan immediately — don't keep pushing
+- Use plan mode for verification steps, not just building
+- Write detailed specs upfront to reduce ambiguity
+
+### Subagent Strategy
+- Use subagents liberally to keep main context window clean
+- Offload research, exploration, and parallel analysis to subagents
+- For complex problems, throw more compute at it via subagents
+- One task per subagent for focused execution
+
+### Surgical Changes
+- Touch only what the request requires — every changed line should trace back to the ask
+- Don't "improve" adjacent code, comments, or formatting in unrelated files
+- Don't refactor what isn't broken; match existing style even if you'd write it differently
+- Only remove imports/vars/functions that YOUR changes orphaned — leave pre-existing dead code alone (mention it, don't delete it)
+- If multiple reasonable interpretations exist, name them and pick one explicitly — don't silently choose and proceed
+
+### Verification Before Done
+- Never mark a task complete without proving it works
+- Transform vague asks into verifiable goals before starting: "fix the bug" → "write a test that reproduces it, then make it pass"; "add validation" → "tests for invalid inputs pass"
+- Diff behavior between main and your changes when relevant
+- Run tests, check logs, demonstrate correctness
+
+### Demand Elegance, Find Root Causes
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky: step back and implement the clean solution
+- No temporary patches that paper over a root cause — senior-engineer standards
+- Skip the elegance pass for simple, obvious fixes — don't over-engineer
+
+### Learn From Corrections
+- After ANY correction: internalize the pattern, don't repeat the mistake
+- Write rules for yourself that prevent the same class of error
+- Ruthlessly iterate until mistake rate drops
+- **Update the research skill**: When corrected on research methodology, experiment design, result
+  interpretation, or scientific reasoning, generalize the lesson (strip all project-specific details)
+  and append it to `~/.claude/skills/research-collaborator/agent-mistakes.md`
+  under the appropriate category. This ensures the correction applies across all future projects.
+
+### Autonomous Bug Fixing
+- When given a bug report: just fix it. Don't ask for hand-holding
+- Point at logs, errors, failing tests — then resolve them
+- Zero context switching required from the user
+- Go fix failing CI tests without being told how
+

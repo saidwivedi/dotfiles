@@ -1,34 +1,13 @@
 {
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/smart-router.sh"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Task",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/subagent-notifier.sh"
-          }
-        ]
-      }
-    ]
+  "env": {
+    "CLAUDE_CODE_NO_FLICKER": "1"
   },
   "statusLine": {
     "type": "command",
-    "command": "bash -c '\"$HOME/.bun/bin/bun\" \"$(ls -td ~/.claude/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | head -1)src/index.ts\"'"
+    "command": "$HOME/.claude/statusline-hud.sh"
   },
   "enabledPlugins": {
-    "swift-lsp@claude-plugins-official": true,
     "claude-hud@claude-hud": true
   },
-  "alwaysThinkingEnabled": false
+  "theme": "light"
 }

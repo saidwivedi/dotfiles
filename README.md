@@ -14,12 +14,12 @@ A modern, feature-rich configuration for shell environments (zsh/bash), vim, and
 │   └── wandb_functions.zsh    # WandB experiment synchronization
 └── claude/
     ├── CLAUDE.md              # Global instructions for Claude Code
-    ├── settings.json          # Hooks and plugin configuration
-    ├── hooks/                 # Custom hook scripts
-    ├── commands/              # Custom slash commands
-    ├── agents/                # Custom agent definitions
-    ├── scripts/               # Utility scripts
-    └── install.sh             # Installation script
+    ├── ENV.md                 # HPC environment notes (template)
+    ├── settings.json          # Statusline + enabled plugins
+    ├── keybindings.json       # Custom key bindings
+    ├── statusline-hud.sh      # claude-hud statusline wrapper
+    ├── install.sh             # Installation script
+    └── README.md              # Setup and skills marketplace pointer
 ```
 
 ## ⚙️ Configuration
@@ -73,14 +73,15 @@ Portable configuration for [Claude Code](https://github.com/anthropics/claude-co
 ```
 
 **Contents:**
-- **CLAUDE.md**: Global instructions and preferences
-- **settings.json**: Hooks, plugins, and statusline configuration
-- **hooks/**: Custom hook scripts (e.g., smart routing, notifications)
-- **commands/**: Custom slash commands
-- **agents/**: Custom agent definitions
-- **scripts/**: Utility scripts
+- **CLAUDE.md**: Global instructions and preferences (Identity section is a placeholder — fill in after install)
+- **ENV.md**: HPC environment template (cluster paths, package manager, filesystem gotchas)
+- **settings.json**: Statusline command and enabled plugins
+- **keybindings.json**: Custom key bindings (e.g. `Ctrl+Shift+C` to copy in scroll mode)
+- **statusline-hud.sh**: Wrapper that runs the [`claude-hud`](https://github.com/anthropics/claude-code) plugin and surfaces API error hints
 
-**Note:** Sensitive data (history, session files, cache) is excluded from this repo.
+Reusable skills (research collaborator, results-to-slides, paper-review, token-usage) live in a separate plugin marketplace: [`saidwivedi/research-skills`](https://github.com/saidwivedi/research-skills). See [`claude/README.md`](claude/README.md) for install steps.
+
+**Note:** Sensitive data (history, session files, cache, credentials) is excluded from this repo.
 
 ### 📡 Download Functions (download_functions.zsh)
 
