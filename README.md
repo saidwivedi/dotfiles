@@ -12,14 +12,18 @@ A modern, feature-rich configuration for shell environments (zsh/bash), vim, and
 │   ├── download_functions.zsh # Advanced rsync-based file transfer utilities
 │   ├── remote_explorer.zsh    # SSHFS remote filesystem mounting
 │   └── wandb_functions.zsh    # WandB experiment synchronization
-└── claude/
-    ├── CLAUDE.md              # Global instructions for Claude Code
-    ├── ENV.md                 # HPC environment notes (template)
-    ├── settings.json          # Statusline + enabled plugins
-    ├── keybindings.json       # Custom key bindings
-    ├── statusline-hud.sh      # claude-hud statusline wrapper
-    ├── install.sh             # Installation script
-    └── README.md              # Setup and skills marketplace pointer
+├── claude/
+│   ├── CLAUDE.md              # Global instructions for Claude Code
+│   ├── ENV.md                 # HPC environment notes (template)
+│   ├── settings.json          # Statusline + enabled plugins
+│   ├── keybindings.json       # Custom key bindings
+│   ├── statusline-hud.sh      # claude-hud statusline wrapper
+│   ├── install.sh             # Installation script
+│   └── README.md              # Setup and skills marketplace pointer
+└── cmux/
+    ├── connect                # Persistent workstation terminal (Tailscale + mosh + tmux)
+    ├── workstation.tmux.conf  # Workstation tmux: workspace-name title + truecolor
+    └── README.md              # connect + cmux setup and reproduction
 ```
 
 ## ⚙️ Configuration
@@ -82,6 +86,17 @@ Portable configuration for [Claude Code](https://github.com/anthropics/claude-co
 Reusable skills (research collaborator, results-to-slides, paper-review, token-usage) live in a separate plugin marketplace: [`saidwivedi/research-skills`](https://github.com/saidwivedi/research-skills). See [`claude/README.md`](claude/README.md) for install steps.
 
 **Note:** Sensitive data (history, session files, cache, credentials) is excluded from this repo.
+
+### 📡 Workstation Access (connect + cmux)
+
+`connect` turns a [cmux](https://cmux.com) terminal into a persistent, auto-resuming window onto a remote workstation over Tailscale — mosh+tmux when reachable (instant resume across sleep/roaming/outage), ssh+tmux otherwise, local shell when offline. Each cmux workspace maps to its own tmux session, and the sidebar name reflects what Claude (or any program) is running there.
+
+```bash
+cp cmux/connect ~/.local/bin/connect && chmod +x ~/.local/bin/connect
+mkdir -p ~/.config/connect && printf 'WS_USER=you\nWS_TS_IP=100.x.y.z\n' > ~/.config/connect/config
+```
+
+See [`cmux/README.md`](cmux/README.md) for the full Mac + workstation reproduction steps.
 
 ### 📡 Download Functions (download_functions.zsh)
 
