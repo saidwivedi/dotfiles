@@ -8,6 +8,8 @@ mkdir -p "$CLAUDE_DIR"
 
 cp "$SCRIPT_DIR/CLAUDE.md"          "$CLAUDE_DIR/"
 cp "$SCRIPT_DIR/ENV.md"             "$CLAUDE_DIR/"
+cp -r "$SCRIPT_DIR/agents"          "$CLAUDE_DIR/"
+[ -f "$CLAUDE_DIR/agent-mistakes.md" ] || cp "$SCRIPT_DIR/agent-mistakes.md" "$CLAUDE_DIR/"  # seed only; preserve locally accumulated entries
 cp "$SCRIPT_DIR/settings.json"      "$CLAUDE_DIR/"
 cp "$SCRIPT_DIR/keybindings.json"   "$CLAUDE_DIR/"
 cp "$SCRIPT_DIR/statusline-hud.sh"  "$CLAUDE_DIR/"

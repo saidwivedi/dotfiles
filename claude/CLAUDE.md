@@ -3,15 +3,19 @@
 These rules bias toward rigor over speed. For trivial tasks, use judgment and skip the ceremony. The rules are working if: diffs contain only lines that trace to the ask, ambiguity surfaces before implementation rather than after, and I rarely have to ask you to redo something.
 
 ## Identity
-## Write about yourself, you active research interest, projects you are working
+## Write about yourself, your active research interests, and the projects you are working on
 
 ## Environment
-## HPC cluster paths, micromamba conventions, and anything specific to working environmet: @~/.claude/ENV.md
+## HPC cluster paths, package-manager conventions, and anything specific to your working environment: @~/.claude/ENV.md
 
 ## Git Workflow
 - Never add "Co-Authored-By: Claude" attribution in commits
 - Never add "Generated with Claude Code" messages anywhere
 - Keep commit messages clean and professional
+
+## Destructive Operations — Always Confirm First
+- Never run `rm -rf` without explicit confirmation, even on paths I appear to have specified
+- Never run `git reset --hard` without explicit confirmation — it discards uncommitted work silently
 
 ## Code Style
 - Only add comments where logic isn't self-evident
@@ -30,10 +34,19 @@ These rules bias toward rigor over speed. For trivial tasks, use judgment and sk
 
 ## Subagent Policy
 - Offload ALL script execution, testing, and analysis to subagents
-- Main agent only: planning, code edits, quick bash checks (job status, ls, git)
+- Main agent only: planning, dispatching to subagents, orchestrating loops/workflows, quick bash checks (job status, ls, git), and bookkeeping edits (trackers, notes). NEVER edit code directly — every code change routes to `opus-implementer` (important/production code) or `sonnet-implementer` (one-off scripts, small changes).
 - Anything that loads models, processes data, or takes >10s → subagent (background when possible)
 - Launch multiple subagents in parallel for independent checks
 - Keep main context clean and responsive — never block on long-running commands
+
+### Model Routing — always delegate via an explicit `subagent_type`
+- The default/`Explore`/`Plan` agents have no pinned model and inherit the MAIN model, so un-typed delegation just clones the main and skips the tiers. Every delegation must name a tier:
+  - plan / decompose → `planner-fable`
+  - important/production code, hard logic, edge cases, architecture → `opus-implementer` (when stuck, ask `codex:codex-rescue` with a focused problem — it advises, you own the call — not a redundant re-implementer)
+  - one-off scripts, small changes, mechanical fully-specified edits → `sonnet-implementer`
+  - audits, code exploration/search, web research, gathering info from sources → `sonnet-scout`
+- Never set `CLAUDE_CODE_SUBAGENT_MODEL` to a concrete model — it overrides every agent's `model:` and flattens all tiers to one. Leave it unset.
+- The MAIN model (set by `/model`, not any agent file) is what the orchestrator's own turns and any un-typed agent run on — keep it cheap; the locked tiers above do the heavy work.
 
 ## When I Paste an Error
 - Diagnose root cause and apply fix immediately
@@ -57,7 +70,7 @@ These rules bias toward rigor over speed. For trivial tasks, use judgment and sk
 - Don't create wrapper scripts unless they add real value
 
 ## Research Conventions
-- Output folder names MUST start with `MMDD_` prefix (e.g. `outputs/0308_<EXP_NAME>/`)
+- Output folder names MUST start with `MMDD_` prefix (e.g. `outputs/0308_baseline/`)
 - Save metrics as `metrics.json` in output folders
 - Log to wandb during training
 - Compare against baselines before declaring success
@@ -71,6 +84,7 @@ These rules bias toward rigor over speed. For trivial tasks, use judgment and sk
 - Skip status updates — be direct
 - Don't create README files for simple implementations
 - Use TodoWrite efficiently — don't update for every tiny step
+- When inspecting images visually, always downscale first (e.g. ~512px on the long side) and read the low-res copy; only read full-res if low-res leaves a question unanswered
 
 ## Workflow
 
@@ -109,10 +123,12 @@ These rules bias toward rigor over speed. For trivial tasks, use judgment and sk
 - After ANY correction: internalize the pattern, don't repeat the mistake
 - Write rules for yourself that prevent the same class of error
 - Ruthlessly iterate until mistake rate drops
-- **Update the research skill**: When corrected on research methodology, experiment design, result
-  interpretation, or scientific reasoning, generalize the lesson (strip all project-specific details)
-  and append it to `~/.claude/skills/research-collaborator/agent-mistakes.md`
-  under the appropriate category. This ensures the correction applies across all future projects.
+- Log the generalized lesson (strip all project-specific details) to the mistakes file matching its scope:
+  - General/operational — repo & file hygiene, git, tooling, communication → `~/.claude/agent-mistakes.md` (create if missing)
+  - Research methodology — experiment design, result interpretation, scientific reasoning → `~/.claude/skills/research-collaborator/agent-mistakes.md`
+  - Format: `- **[Pattern name.]** [what not to do and why; what to do instead]`, one line per entry
+
+Global mistakes log (auto-loaded before work): @~/.claude/agent-mistakes.md
 
 ### Autonomous Bug Fixing
 - When given a bug report: just fix it. Don't ask for hand-holding

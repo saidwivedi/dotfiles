@@ -14,6 +14,8 @@ Copies these files to `~/.claude/`:
 | -------------------- | ------------------------------------------------------------ |
 | `CLAUDE.md`          | Global instructions loaded into every session                |
 | `ENV.md`             | HPC environment notes, referenced from `CLAUDE.md` via `@`   |
+| `agents/`            | Subagent definitions used by the model routing tiers below   |
+| `agent-mistakes.md`  | Seeded once; preserves locally accumulated entries thereafter |
 | `settings.json`      | Statusline + enabled plugins                                 |
 | `keybindings.json`   | Custom key bindings (`Ctrl+Shift+C` to copy in scroll mode)  |
 | `statusline-hud.sh`  | Wrapper that runs `claude-hud` and surfaces error hints      |
@@ -21,6 +23,19 @@ Copies these files to `~/.claude/`:
 After install, fill in the placeholders:
 - `~/.claude/CLAUDE.md` — Identity section
 - `~/.claude/ENV.md`    — cluster paths, package manager, work dirs
+
+## Subagent Model Routing
+
+`CLAUDE.md` requires every delegation to name an explicit `subagent_type` — untyped agents (default/`Explore`/`Plan`) inherit the main model instead of a pinned tier. Definitions for the pinned tiers live in `agents/`:
+
+| Tier                | Agent file               | Use for                                                              |
+| ------------------- | ------------------------- | --------------------------------------------------------------------- |
+| Plan / decompose     | `planner-fable.md`        | Architecture decisions, task breakdown                                |
+| Important/production code | `opus-implementer.md`| Hard logic, edge cases, architecture (all code edits route here or below — main agent never edits code directly) |
+| One-off scripts       | `sonnet-implementer.md`   | Small, mechanical, fully-specified edits                              |
+| Research/audits       | `sonnet-scout.md`         | Code exploration, web research, gathering info                        |
+
+The main model (set via `/model`) should stay cheap — it only plans, dispatches, and does bookkeeping; the pinned tiers do the heavy lifting.
 
 ## Statusline (claude-hud)
 
