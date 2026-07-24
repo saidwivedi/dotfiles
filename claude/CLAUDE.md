@@ -18,50 +18,38 @@ These rules bias toward rigor over speed. For trivial tasks, use judgment and sk
 - Never run `git reset --hard` without explicit confirmation — it discards uncommitted work silently
 
 ## Code Style
-- Only add comments where logic isn't self-evident
 - argparse for all scripts with sensible defaults
 - Always set random seeds for reproducibility
 - Use `skip-if-exists` pattern for long-running batch jobs
 
 ## Communication
-- Be concise. No recaps, no pleasantries
+- One response per task: outcome first, then only detail that changes what I'd do next. No play-by-play during work, no filler, no pleasantries, no emojis
 - Ask clarifying questions when the ask itself is ambiguous — unclear scope, multiple reasonable interpretations, unstated constraints. Surface the ambiguity before implementing, don't silently pick
 - Don't ask for permission ("want me to run it?", "should I proceed?") — mode shortcuts below cover that
-- Don't use emojis
 - Focus on technical accuracy over validation
-- One response per action — don't split into multiple messages
-- Don't paraphrase what you just did — I saw it happen
 
 ## Subagent Policy
-- Offload ALL script execution, testing, and analysis to subagents
-- Main agent only: planning, dispatching to subagents, orchestrating loops/workflows, quick bash checks (job status, ls, git), and bookkeeping edits (trackers, notes). NEVER edit code directly — every code change routes to `opus-implementer` (important/production code) or `sonnet-implementer` (one-off scripts, small changes).
-- Anything that loads models, processes data, or takes >10s → subagent (background when possible)
-- Launch multiple subagents in parallel for independent checks
-- Keep main context clean and responsive — never block on long-running commands
+- Offload ALL script execution, testing, analysis, research, and exploration to subagents — use them liberally
+- Main agent only: planning, decomposition, dispatching, judging results, quick bash checks (job status, ls, git), and bookkeeping edits (trackers, notes, config files). Never implement — delegate for context isolation; only conclusions return to main
+- Micro-edit exception: file already fully in main context and the fix is a few unambiguous lines → main edits directly
+- Anything that loads models, processes data, or takes >10s → subagent (background when possible); never block main on long-running commands
+- Independent checks → parallel subagents in one dispatch; hard problems → more agents (independent attempts, adversarial verification), not longer thought
+- One task per subagent. A subagent's "done" is a claim — verify against the completion artifact (diff, test output, on-disk file)
 
-### Model Routing — always delegate via an explicit `subagent_type`
-- The default/`Explore`/`Plan` agents have no pinned model and inherit the MAIN model, so un-typed delegation just clones the main and skips the tiers. Every delegation must name a tier:
-  - plan / decompose → `planner-fable`
-  - important/production code, hard logic, edge cases, architecture → `opus-implementer` (when stuck, ask `codex:codex-rescue` with a focused problem — it advises, you own the call — not a redundant re-implementer)
-  - one-off scripts, small changes, mechanical fully-specified edits → `sonnet-implementer`
-  - audits, code exploration/search, web research, gathering info from sources → `sonnet-scout`
-- Never set `CLAUDE_CODE_SUBAGENT_MODEL` to a concrete model — it overrides every agent's `model:` and flattens all tiers to one. Leave it unset.
-- The MAIN model (set by `/model`, not any agent file) is what the orchestrator's own turns and any un-typed agent run on — keep it cheap; the locked tiers above do the heavy work.
+### Model Routing — every dispatch names a tier deliberately
+- plan / decompose → `planner-fable`
+- production code, hard logic, edge cases, architecture (spec complete) → `opus-implementer`
+- one-off scripts, mechanical fully-specified edits → `sonnet-implementer`
+- audits, code search, web research, info gathering → `sonnet-scout` (trust positives with file:line, never negatives)
+- stuck / second opinion → `codex:codex-rescue` — it diagnoses, you own the call; not a re-implementer
+- implementation where the hard part IS the implementation → un-typed `general-purpose` (inherits the MAIN model — the top tier; deliberate use only, never a lazy default)
+- Escalation on failure: opus attempt 1 → opus with the failure folded into a sharper spec → un-typed (main-model) with full history → last resort: main itself, in a worktree
+- The MAIN model (set by `/model`, not any agent file) runs the orchestrator and any un-typed agent — keep it strong (Fable-class): judgment compounds in main, cost lives in the tiers
+- Never set `CLAUDE_CODE_SUBAGENT_MODEL` to a concrete model — it overrides every agent's `model:` and flattens all tiers to one. Leave it unset
 
-## When I Paste an Error
-- Diagnose root cause and apply fix immediately
-- Don't ask clarifying questions — read the traceback and relevant code
-- Show the fix, suggest the re-run command
-
-## When I Say "Run It"
-- Execute the script, capture full output, analyze results
-- Don't ask for confirmation — just run
-- If it fails, diagnose and fix without waiting for me
-
-## When I Say "Check Results"
-- Read metrics.json (or equivalent) from all relevant subdirs
-- Generate a comparison table
-- Identify best/worst, flag anomalies
+## Mode Shortcuts
+- Errors, logs, failing tests, or CI I point at: diagnose root cause and fix immediately — no clarifying questions; suggest the re-run command
+- "Check results": read metrics.json (or equivalent) from all relevant subdirs, build a comparison table, flag best/worst and anomalies
 
 ## Documentation
 - Never create unsolicited READMEs, architecture diagrams, or summary docs
@@ -70,7 +58,7 @@ These rules bias toward rigor over speed. For trivial tasks, use judgment and sk
 - Don't create wrapper scripts unless they add real value
 
 ## Research Conventions
-- Output folder names MUST start with `MMDD_` prefix (e.g. `outputs/0308_baseline/`)
+- Output folder names MUST start with `MMDD_` prefix (e.g. `outputs/0308_baseline/`); never overwrite an existing dated folder — bump the date or add a suffix
 - Save metrics as `metrics.json` in output folders
 - Log to wandb during training
 - Compare against baselines before declaring success
@@ -79,26 +67,13 @@ These rules bias toward rigor over speed. For trivial tasks, use judgment and sk
 - Exploration scripts go in `explore/`, promoted to main modules when validated
 
 ## Token Conservation
-- Don't repeat yourself — no recap messages after completing work
-- Don't write test files unless explicitly requested
-- Skip status updates — be direct
-- Don't create README files for simple implementations
 - Use TodoWrite efficiently — don't update for every tiny step
 - When inspecting images visually, always downscale first (e.g. ~512px on the long side) and read the low-res copy; only read full-res if low-res leaves a question unanswered
 
 ## Workflow
 
-### Plan Before Build
-- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
-- If something goes sideways, STOP and re-plan immediately — don't keep pushing
-- Use plan mode for verification steps, not just building
-- Write detailed specs upfront to reduce ambiguity
-
-### Subagent Strategy
-- Use subagents liberally to keep main context window clean
-- Offload research, exploration, and parallel analysis to subagents
-- For complex problems, throw more compute at it via subagents
-- One task per subagent for focused execution
+- Non-trivial work (3+ steps, open design decisions, failed first fix, fuzzy scope) → enter plan mode before building
+- If something goes sideways mid-task, STOP and re-plan immediately — don't keep pushing
 
 ### Surgical Changes
 - Touch only what the request requires — every changed line should trace back to the ask
@@ -107,32 +82,16 @@ These rules bias toward rigor over speed. For trivial tasks, use judgment and sk
 - Only remove imports/vars/functions that YOUR changes orphaned — leave pre-existing dead code alone (mention it, don't delete it)
 - If multiple reasonable interpretations exist, name them and pick one explicitly — don't silently choose and proceed
 
-### Verification Before Done
-- Never mark a task complete without proving it works
-- Transform vague asks into verifiable goals before starting: "fix the bug" → "write a test that reproduces it, then make it pass"; "add validation" → "tests for invalid inputs pass"
-- Diff behavior between main and your changes when relevant
-- Run tests, check logs, demonstrate correctness
-
-### Demand Elegance, Find Root Causes
-- For non-trivial changes: pause and ask "is there a more elegant way?"
-- If a fix feels hacky: step back and implement the clean solution
-- No temporary patches that paper over a root cause — senior-engineer standards
-- Skip the elegance pass for simple, obvious fixes — don't over-engineer
-
 ### Learn From Corrections
 - After ANY correction: internalize the pattern, don't repeat the mistake
 - Write rules for yourself that prevent the same class of error
 - Ruthlessly iterate until mistake rate drops
 - Log the generalized lesson (strip all project-specific details) to the mistakes file matching its scope:
-  - General/operational — repo & file hygiene, git, tooling, communication → `~/.claude/agent-mistakes.md` (create if missing)
+  - General/operational, cross-cutting — repo & file hygiene, git, communication → `~/.claude/agent-mistakes.md`
+  - Domain-specific operational → a per-domain file in `~/.claude/mistakes/` (created as lessons accumulate), indexed from `agent-mistakes.md`
   - Research methodology — experiment design, result interpretation, scientific reasoning → `~/.claude/skills/research-collaborator/agent-mistakes.md`
   - Format: `- **[Pattern name.]** [what not to do and why; what to do instead]`, one line per entry
+- Boundary vs auto-memory: mistakes files hold generalized behavioral rules (how to work, project-stripped); auto-memory holds facts and project state (what is true). A correction that only makes sense inside one project → auto-memory; one that generalizes → mistakes file. Never both
 
 Global mistakes log (auto-loaded before work): @~/.claude/agent-mistakes.md
-
-### Autonomous Bug Fixing
-- When given a bug report: just fix it. Don't ask for hand-holding
-- Point at logs, errors, failing tests — then resolve them
-- Zero context switching required from the user
-- Go fix failing CI tests without being told how
 

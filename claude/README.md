@@ -26,16 +26,16 @@ After install, fill in the placeholders:
 
 ## Subagent Model Routing
 
-`CLAUDE.md` requires every delegation to name an explicit `subagent_type` — untyped agents (default/`Explore`/`Plan`) inherit the main model instead of a pinned tier. Definitions for the pinned tiers live in `agents/`:
+`CLAUDE.md` routes every delegation to a deliberate tier. Untyped agents (default/`Explore`/`Plan`) inherit the main model — with a strong main model this is the top implementation tier, reserved for work whose hard part can't be fully specified upfront. Definitions for the pinned tiers live in `agents/`:
 
 | Tier                | Agent file               | Use for                                                              |
 | ------------------- | ------------------------- | --------------------------------------------------------------------- |
 | Plan / decompose     | `planner-fable.md`        | Architecture decisions, task breakdown                                |
-| Important/production code | `opus-implementer.md`| Hard logic, edge cases, architecture (all code edits route here or below — main agent never edits code directly) |
+| Important/production code | `opus-implementer.md`| Hard logic, edge cases, architecture (code edits route here or below; main edits directly only for micro-edits already fully in its context) |
 | One-off scripts       | `sonnet-implementer.md`   | Small, mechanical, fully-specified edits                              |
 | Research/audits       | `sonnet-scout.md`         | Code exploration, web research, gathering info                        |
 
-The main model (set via `/model`) should stay cheap — it only plans, dispatches, and does bookkeeping; the pinned tiers do the heavy lifting.
+The main model (set via `/model`) is the orchestrator: it plans, dispatches, and judges results but doesn't implement — delegation keeps implementation noise (file reads, tracebacks, retries) out of its context. Keep it strong: judgment compounds in main, cost lives in the tiers.
 
 ## Statusline (claude-hud)
 
