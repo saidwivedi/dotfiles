@@ -1,88 +1,116 @@
 #!/usr/bin/env bash
-# connect — make this terminal a persistent, auto-resuming window into your workstation.
+# connect — persistent mosh+tmux window into the workstation.
 #
-# Transport priority (chosen automatically at launch):
-#   1. mosh + tmux over Tailscale  — instant local echo; survives roaming, sleep, and
-#      network outages (mosh pauses and silently resumes). The "AnyDesk for terminals" path.
-#   2. ssh  + tmux over Tailscale  — processes preserved; reconnect by reopening the tab.
-#   3. local laptop shell          — only when fully offline; rerun `connect` to reconnect.
+# When the cmux app is running, this opens a cmux-managed remote workspace
+# (cmux mosh-tmux): mosh survives roaming/sleep/outages as before, and the
+# Files sidebar / diff view track the REMOTE working directory. Requires the
+# "Remote tmux" beta toggle in cmux Settings and tmux >= 3.2 on the host.
 #
-# Each cmux workspace maps to its own tmux session (cmux-<workspace-id>), so reopening a
-# workspace — even after sleep / outage / reboot — drops you back into the same running work.
+# Outside cmux (or with CONNECT_LEGACY=1) it falls back to the old inline
+# mosh/ssh + tmux transports.
 #
-# Setup: put your workstation coordinates in ~/.config/connect/config (or export them):
+# Setup: put your workstation coordinates in ~/.config/connect/config:
 #     WS_USER=alice
-#     WS_TS_IP=100.x.y.z              # Tailscale IP — run `tailscale ip -4` on the workstation
-#     WS_MOSH_SERVER=mosh-server      # path to mosh-server on the workstation (optional)
+#     WS_TS_IP=100.x.y.z              # tailscale ip -4 on the workstation
+#     WS_MOSH_SERVER=mosh-server      # legacy path only
 #
-# Usage:  connect            connect to the workstation (auto-selects transport)
-#         connect status     show reachability + the session this workspace maps to
-#         CONNECT_SESSION=foo connect   force a specific tmux session name
+# Usage:  connect              new workspace + fresh tmux session every time
+#         connect --resume     pick a running session on the workstation and reattach
+#         connect <session>    create/reattach a named session (e.g. connect gpu)
+#         connect status       show reachability + transport selection
 
 set -uo pipefail
 
-# --- workstation coordinates (from ~/.config/connect/config or the environment) ---
 CONNECT_CONFIG="${CONNECT_CONFIG:-$HOME/.config/connect/config}"
 [ -f "$CONNECT_CONFIG" ] && . "$CONNECT_CONFIG"
 WS_USER="${WS_USER:-}"
 WS_TS_IP="${WS_TS_IP:-}"
-WS_MOSH_SERVER="${WS_MOSH_SERVER:-mosh-server}"   # on PATH, or an absolute path on the workstation
+WS_MOSH_SERVER="${WS_MOSH_SERVER:-mosh-server}"
 
 if [ -z "$WS_USER" ] || [ -z "$WS_TS_IP" ]; then
   printf '[connect] set WS_USER and WS_TS_IP in %s or the environment.\n' "$CONNECT_CONFIG" >&2
-  printf '          WS_TS_IP is your workstation Tailscale IP (run: tailscale ip -4 there).\n' >&2
   exit 1
 fi
 
-# mosh gives seamless auto-resume but needs its UDP ports (60000-61000) reachable.
-# It is used ONLY once that path is verified, signalled by this flag file. Until then
-# connect uses ssh+tmux over Tailscale (works today; reconnect by reopening the tab).
 MOSH_OK_FLAG="${MOSH_OK_FLAG:-$HOME/.config/connect/mosh-ok}"
 mosh_enabled() { [ -f "$MOSH_OK_FLAG" ] || [ "${CONNECT_MOSH:-0}" = "1" ]; }
+reachable()    { nc -z -G "${3:-2}" "$1" "$2" >/dev/null 2>&1; }
+banner()       { printf '\033[2m[connect] %s\033[0m\n' "$1" >&2; }
 
-# --- derive a stable per-workspace tmux session name ---
-# cmux injects CMUX_WORKSPACE_ID into every surface; it is stable across reopen/restart,
-# so it is the right key. (To key on a human title instead, set CONNECT_SESSION.)
-ws_key() {
-  local id="${CMUX_WORKSPACE_ID:-}"
-  if [ -n "$id" ]; then
-    printf 'cmux-%s' "$(printf '%s' "$id" | tr 'A-Z' 'a-z' | tr -cd 'a-f0-9' | cut -c1-8)"
-  else
-    printf 'cmux-%s' "$(tty 2>/dev/null | tr -cd 'a-z0-9' | tail -c 6)"   # outside cmux: per-tty
-  fi
-}
-SESS="${CONNECT_SESSION:-$(ws_key)}"
-[ -n "$SESS" ] || SESS="cmux-default"
+CMUX_CLI="${CMUX_CLI:-/Applications/cmux.app/Contents/Resources/bin/cmux}"
+cmux_up() { [ -x "$CMUX_CLI" ] && "$CMUX_CLI" ping >/dev/null 2>&1; }
 
-reachable() { nc -z -G "${3:-2}" "$1" "$2" >/dev/null 2>&1; }   # host port [timeout-secs]
-banner()    { printf '\033[2m[connect] %s\033[0m\n' "$1" >&2; }
-
-# --- status mode ---
 if [ "${1:-}" = "status" ]; then
+  SESS="${CONNECT_SESSION:-main}"
   reachable "$WS_TS_IP" 22 2 && echo "tailscale : UP   ($WS_TS_IP)" || echo "tailscale : down"
-  mosh_enabled && echo "mosh      : ENABLED (instant-resume)" || echo "mosh      : off (ssh+tmux; touch $MOSH_OK_FLAG to enable)"
+  mosh_enabled && echo "mosh      : ENABLED (instant-resume)" || echo "mosh      : off (touch $MOSH_OK_FLAG to enable)"
+  cmux_up && echo "cmux      : UP (remote workspace with sidebar tracking)" || echo "cmux      : not running (legacy inline transport)"
   echo "session   : $SESS"
   exit 0
 fi
 
-# 1) mosh + tmux over Tailscale — seamless auto-resume (only when its UDP path is verified)
+# connect --resume: pick one of the tmux sessions already running on the
+# workstation and reattach it in a new cmux workspace.
+if [ "${1:-}" = "--resume" ] || [ "${1:-}" = "resume" ]; then
+  LIST=$(ssh -o ConnectTimeout=8 "$WS_USER@$WS_TS_IP" \
+    '~/.local/bin/tmux ls -F "#{session_name}|#{session_windows}|#{?session_attached,attached,detached}|#{t:session_activity}" 2>/dev/null')
+  [ -z "$LIST" ] && { banner "no tmux sessions running on the workstation"; exit 1; }
+  echo "tmux sessions on $WS_TS_IP:"
+  i=0; names=()
+  while IFS='|' read -r name wins att act; do
+    i=$((i+1)); names+=("$name")
+    printf '  %2d) %-22s %sw  %-9s %s\n' "$i" "$name" "$wins" "$att" "$act"
+  done <<< "$LIST"
+  printf 'resume which session [1-%d]? ' "$i"
+  read -r choice
+  case "$choice" in (''|*[!0-9]*) echo "aborted"; exit 1 ;; esac
+  { [ "$choice" -ge 1 ] && [ "$choice" -le "$i" ]; } || { echo "invalid choice"; exit 1; }
+  SESS="${names[$((choice-1))]}"
+  banner "resuming session $SESS  (attached sessions will mirror in both views)"
+else
+  # Bare `connect` always opens a fresh, independent tmux session; pass a name
+  # (e.g. `connect gpu`) to create/reattach a specific one.
+  SESS="${1:-${CONNECT_SESSION:-main-$(date +%m%d-%H%M%S)}}"
+fi
+
+# 1) cmux-managed remote workspace — mosh + tmux, sidebar tracks the remote cwd
+if [ "${CONNECT_LEGACY:-0}" != "1" ] && cmux_up && reachable "$WS_TS_IP" 22 2; then
+  TARGET="$WS_USER@$WS_TS_IP"
+  export CMUX_QUIET=1
+  if mosh_enabled; then
+    banner "cmux mosh-tmux -> $TARGET   session=$SESS"
+    OUT=$("$CMUX_CLI" mosh-tmux "$TARGET" --session "$SESS") || { echo "$OUT"; exit 1; }
+    echo "$OUT"
+    # mosh-tmux returns immediately; focus the workspace it created.
+    NEW=$(printf '%s\n' "$OUT" | grep -o 'workspace:[0-9]*' | head -1)
+    [ -n "$NEW" ] && "$CMUX_CLI" select-workspace --workspace "$NEW"
+    # If connect was typed inside a cmux workspace, close that one after the
+    # jump. Must be the last thing we do: closing it kills this shell.
+    if [ -n "$NEW" ] && [ -n "${CMUX_WORKSPACE_ID:-}" ]; then
+      exec "$CMUX_CLI" close-workspace --workspace "$CMUX_WORKSPACE_ID"
+    fi
+    exit 0
+  fi
+  banner "cmux ssh-tmux -> $TARGET"
+  exec "$CMUX_CLI" ssh-tmux "$TARGET"
+fi
+
+# 2) mosh + tmux inline — seamless auto-resume, no sidebar tracking
 if mosh_enabled && reachable "$WS_TS_IP" 22 2; then
   banner "mosh -> $WS_USER@$WS_TS_IP   session=$SESS"
-  # Drop mosh's "[mosh] " window-title prefix so the cmux sidebar shows just the
-  # tmux title. mosh-client reads this from its own environment.
   export MOSH_TITLE_NOPREFIX=1
   exec mosh --predict=adaptive --server="$WS_MOSH_SERVER" \
        --ssh="ssh -o ConnectTimeout=8" "$WS_USER@$WS_TS_IP" \
        -- env COLORTERM=truecolor tmux new-session -A -s "$SESS"
 fi
 
-# 2) ssh + tmux over Tailscale — works today; reconnect by reopening the tab (tmux preserves work)
+# 3) ssh + tmux inline
 if reachable "$WS_TS_IP" 22 2; then
   banner "ssh -> $WS_USER@$WS_TS_IP   session=$SESS"
   exec ssh -t -o ConnectTimeout=8 -o ServerAliveInterval=20 -o ServerAliveCountMax=3 \
        "$WS_USER@$WS_TS_IP" "env COLORTERM=truecolor tmux new-session -A -s '$SESS'"
 fi
 
-# 3) fully offline -> local shell
+# 4) fully offline -> local shell
 banner "workstation unreachable — dropping to local shell. Run 'connect' to reconnect."
 exec "${SHELL:-/bin/zsh}" -l

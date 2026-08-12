@@ -1,0 +1,18 @@
+#!/bin/bash
+# cmux preferredEditor hook: open the file in vim in a split of the selected workspace.
+CMUX=/Applications/cmux.app/Contents/Resources/bin/cmux
+LOG=/tmp/cmux-edit.log
+printf '%s %s\n' "$(date '+%F %T')" "$*" >> "$LOG"
+[ -n "${1:-}" ] || exit 1
+
+WS=$(CMUX_QUIET=1 "$CMUX" list-workspaces 2>>"$LOG" | awk '/^\*/{print $2}')
+[ -n "$WS" ] || { echo "no selected workspace" >> "$LOG"; exit 1; }
+
+OUT=$(CMUX_QUIET=1 "$CMUX" new-split right --workspace "$WS" 2>>"$LOG")
+SURF=$(printf '%s' "$OUT" | grep -oE 'surface:[0-9]+' | head -1)
+[ -n "$SURF" ] || { echo "split failed: $OUT" >> "$LOG"; exit 1; }
+
+sleep 0.3
+printf -v cmd 'exec vim %q' "$1"
+"$CMUX" send --workspace "$WS" --surface "$SURF" "$cmd" >> "$LOG" 2>&1
+"$CMUX" send-key --workspace "$WS" --surface "$SURF" enter >> "$LOG" 2>&1
